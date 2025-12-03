@@ -1,0 +1,36 @@
+# Compiled Java files
+*.class
+
+# JavaDoc generated files
+*.html
+allclasses-index.html
+allpackages-index.html
+element-list
+help-doc.html
+index-all.html
+index.html
+overview-tree.html
+package-search-index.js
+package-summary.html
+package-tree.html
+member-search-index.js
+module-search-index.js
+tag-search-index.js
+type-search-index.js
+search.html
+legal/
+resource-files/
+script-files/
+
+# JAR files (if you want to exclude the library)
+# maze-environment.jar
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
