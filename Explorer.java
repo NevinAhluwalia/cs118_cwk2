@@ -8,6 +8,8 @@ import java.util.ArrayList;
  * @version 1.0
  */
 public class Explorer {
+    private int pollRun = 0; // Incremented after each pass
+    private RobotData robotData; // Data store for junctions
     /**
     * Main control method called by the maze simulator to determine
     * the robot's next move based on the number of non-wall exits.
@@ -15,6 +17,10 @@ public class Explorer {
     * @param robot The IRobot interface providing access to maze information
     */
     public void controlRobot(IRobot robot) {
+        if ((robot.getRuns() == 0) && (pollRun == 0))
+            robotData = new RobotData(); //reset the data store
+        pollRun++;
+
         int direction = 0;
         int exits = nonwallExits(robot);
         System.out.println(exits);
@@ -37,6 +43,10 @@ public class Explorer {
         }
 
         robot.face(direction);
+    }
+
+    public void reset() {
+        robotData.resetJunctionCounter();
     }
     
     /**
@@ -160,8 +170,59 @@ public class Explorer {
         }
         return num_beenbefore;
     }
+
+    private void unencountered_junction(IRobot robot){
+        robotData = new RobotData();
+        int unencountered_or_not = beenbeforeExits(robot);
+        if (unencountered_or_not < 1){
+            int x = robot.getLocation().x;
+            int y = robot.getLocation().y;
+            int arrivedFrom = robot.getHeading();
+            robotData.recordJunction(x,y, arrivedFrom);
+        }
+    }
+}
+
+class JunctionRecorder { 
+    private int x;
+    private int y;
+    private int arrivedFrom;
+
+    public JunctionRecorder(int x, int y , int arrivedFrom) {
+        this.x = x; 
+        this.y = y;
+        this.arrivedFrom = arrivedFrom;
+    }
+    public int getX() { return x; }
+    public int getY() { return y; }
+    public int getArrivedFrom() { return arrivedFrom; }
+
 }
 
 class RobotData {
+    private static int maxJunctions = 10000;
+    private static int junctionCounter; 
+    private JunctionRecorder[] junctions;
+    
+    public void resetJunctionCounter() {
+        junctionCounter = 0;
+    }
+
+    public void recordJunction(int x, int y, int arrivedFrom ){
+        junctions[junctionCounter] = new JunctionRecorder(x, y, arrivedFrom);
+        printJunction(junctionCounter);
+        junctionCounter++;
+    
+        
+    }
+
+    public void printJunction(int index){
+        JunctionRecorder j = junctions[index];
+        int x = j.getX();
+        int y = j.getY();
+        int arrivedFrom = j.getArrivedFrom();
+        System.out.println("Junction " + junctionCounter + "(" + x + "," + y + ")" + "heading" + arrivedFrom);
+
+    }
 
 }
