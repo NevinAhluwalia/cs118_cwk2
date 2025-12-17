@@ -38,7 +38,7 @@ import java.util.ArrayList;
  * @author Nevin Ahluwalia
  * @version 1.0
  */
-public class Explorer {
+public class Ex1 {
     private int pollRun = 0; // Incremented after each pass
     private RobotData robotData;
     private int explorerMode = 1; // 1 = explore, 0 = backtrack
