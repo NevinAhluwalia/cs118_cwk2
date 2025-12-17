@@ -1,35 +1,21 @@
 import uk.ac.warwick.dcs.maze.logic.IRobot;
 import java.util.ArrayList;
 
-// Ex1 Preamble
-// passageExits was implemented similarly to nonwallExits, both using look() to inspect walls. passageExits randomly 
-// chooses if multiple passages exist. the junction_and_crossroad functiocombines junction/crossroad handling. The remaining 
-// two methods both require random directions , with one leaving out BEHIND. 
 
-// To ensure efficeny  I constructed a random_avoid_wall function as all the controller methods needed it so it 
-// prevented unneeded duplication of the code within the functions . 
+//So if as long as we have the relative direction
+// then we just need to find the junction that matches said relative direction
+// we can do this by converting the arrivedFrom heading to a relative direction
+// Then we just backtrack until we find said direction
 
-// RobotData contains an array of JunctionRecorder objects, enabling encapsulation and chronological storage. This allows 
-// my backtracking algorithm to easily find when a junction was first encountered by indexing the array.
+// Lists of things we need to do to implement this i.e design steps 
+// 1. Remove all the code that needs a location
+// 2. In the reverse direction code we need to add some extra code
+// this says look if we are at a junction check does the arrivedFrom match
+// the relative direction we were looking for if it does then yes 
+// head down that junction
 
-// There is a minimal amount of repeated code, mainly with calling helper functions but structurally there are no large 
-// amounts of code repeated its why i created functions such as random_avoid_wall to avoid this exact problem. 
-
-// If the logic was simplified for backtrackControl and if the design steps provided an alternate approach then this 
-// function could have been combined with the exploreControl method then use a conditional to choose between modes within 
-// the function.  This helps with no longer having to keep track of a variable to manage states, this could become a real 
-// problem as the code gets longer and we need to remember to write code to flip between states, as we don’t have 
-// code that automatically does it for us.
-
-// Regarding the worst case analysis :
-// The robot will always find the target by randomly exploring when all junctions are explored, ensuring the target is found.
-// Now we can use this to determine the worst case number of steps which is 
-// steps_max = 847 - W + Z
-// Z is the number of steps where the robot is on a BEENBEFORE square
-// where W is the number of walls in the maze ,847 is the number of squares in the maze except the target square
-// So this assumes the robot is unlucky and ends up checking every square and we account for the robot moving upon the
-// same square twice which will happen if it gets unlucky enough to check every square
-
+//List of issues
+//What 
 
 /**
  * Controls a robot to explore a maze using various navigation strategies
