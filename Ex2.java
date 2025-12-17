@@ -1,21 +1,12 @@
 import uk.ac.warwick.dcs.maze.logic.IRobot;
 import java.util.ArrayList;
-
-
-//So if as long as we have the relative direction
-// then we just need to find the junction that matches said relative direction
-// we can do this by converting the arrivedFrom heading to a relative direction
-// Then we just backtrack until we find said direction
-
-// Lists of things we need to do to implement this i.e design steps 
-// 1. Remove all the code that needs a location
-// 2. In the reverse direction code we need to add some extra code
-// this says look if we are at a junction check does the arrivedFrom match
-// the relative direction we were looking for if it does then yes 
-// head down that junction
-
-//List of issues
-//What 
+// Ex2 Preamble
+// This implementation will save space by 67%, this is because of instead of storing 
+// 3 objects in the junctionRecorder array we only store 1 so 1/3 the original space
+// We also have better space storage as we use a LIFO stack approach, this allow us
+// to backtrack through junctions in reverse chronological order and after backtracking
+// we remove that junction from the stack which allows us to maintain the correct order
+// without needing location information
 
 /**
  * Controls a robot to explore a maze using various navigation strategies
@@ -79,10 +70,11 @@ public class Explorer {
 
         int unencountered_or_not = beenbeforeExits(robot);
         if ((unencountered_or_not < 1) && (exits == 3 || exits == 4)){
-            int x = robot.getLocation().x;
-            int y = robot.getLocation().y;
-            int arrivedFrom = robot.getHeading();
-            robotData.recordJunction(x,y, arrivedFrom);
+            int passageExits = passageExits(robot);
+            if (passageExits > 0){
+                int arrivedFrom = robot.getHeading();
+                robotData.recordJunction(arrivedFrom);
+            }
         }
         robot.face(direction);
 
@@ -100,19 +92,21 @@ public class Explorer {
     public void backtrackControl(IRobot robot){ 
         int final_heading;
         int nonwallExits = nonwallExits(robot);
-        int x = robot.getLocation().x;
-        int y = robot.getLocation().y;
-        int arrivedFrom = robot.getHeading();
         if (nonwallExits > 2){
             if (passageExits(robot) > 0){ 
                 explorerMode = 1;
                 int direction = passageExits(robot);
-                robotData.recordJunction(x ,y, arrivedFrom);
                 robot.face(direction);
             } else {
-                int res = robotData.searchJunction(x,y);
-                final_heading = (res == 1000 || res == 1001) ? res + 2 : res - 2;
-                robot.setHeading(final_heading);
+                int arrivedFrom = robotData.getMostRecentJunction();
+                if (arrivedFrom != -1){
+                    final_heading = (arrivedFrom == 1000 || arrivedFrom == 1001) ? arrivedFrom + 2 : arrivedFrom - 2;
+                    robot.setHeading(final_heading);
+                    robotData.removeMostRecentJunction();
+                } else {
+                    final_heading = deadend(robot);
+                    robot.face(final_heading);
+                }
             }
         } else if (nonwallExits == 2){
             final_heading = corridor(robot);
@@ -263,48 +257,30 @@ public class Explorer {
 
 /**
  * This is a data holder class that records information about a single junction:
- * its coordinates within the maze and heading from which the robot was in when it
- * first arrived at the junction
+ * the heading from which the robot was in when it first arrived at the junction.
+ * No coordinates are stored to minimize memory usage.
  */
 class JunctionRecorder { 
-    private int x;
-    private int y;
     private int arrivedFrom;
 
     /**
      * Constructs a new {@code JunctionRecorder} with the supplied details.
      *
-     * @param x the x-coordinate of the junction
-     * @param y the y-coordinate of the junction
      * @param arrivedFrom the heading from which the robot first arrived
      *                    at this junction
      */
-    public JunctionRecorder(int x, int y , int arrivedFrom) {
-        this.x = x; 
-        this.y = y;
+    public JunctionRecorder(int arrivedFrom) {
         this.arrivedFrom = arrivedFrom;
     }
-    /**
-     * Returns the x-coordinate of this junction.
-     *
-     * @return the x-coordinate
-     */
-    public int getX() { return x; }
-
-    /**
-     * Returns the y-coordinate of this junction.
-     *
-     * @return the y-coordinate
-     */
-    public int getY() { return y; }
 
     /**
      * Returns the heading from which the robot first arrived at this junction.
      *
      * @return the arrival heading
      */
-    public int getArrivedFrom() { return arrivedFrom; }
-
+    public int getArrivedFrom() { 
+        return arrivedFrom; 
+    }
 }
 
 /**
@@ -336,58 +312,34 @@ class RobotData {
 
 
     /**
-     * Records a new junction in the array and prints its details.
+     * Records a new junction with unexplored paths in the LIFO stack.
      *
-     * @param x the x-coordinate of the junction
-     * @param y the y-coordinate of the junction
-     * @param arrivedFrom the heading from which the robot first arrived
-     *                    at the junction
+     * @param arrivedFrom the heading from which the robot first arrived at the junction
      */
-    public void recordJunction(int x, int y, int arrivedFrom ){
-        junctions[junctionCounter] = new JunctionRecorder(x, y, arrivedFrom);
-        printJunction(junctionCounter);
+    public void recordJunction(int arrivedFrom){
+        junctions[junctionCounter] = new JunctionRecorder(arrivedFrom);
         junctionCounter++;
     }
 
     /**
-     * Prints information about the junction stored at the given index.
-     * The information includes which number junction it is, its coordinates and
-     * the heading from which the robot first arrived there.
+     * Gets the most recent junction from the LIFO stackl; .
      *
-     * @param index the index of the junction to be printed
+     * @return the arrival heading of the most recent junction, or -1 if stack is empty
      */
-    public void printJunction(int index){
-        JunctionRecorder j = junctions[index];
-        int x = j.getX();
-        int y = j.getY();
-        int arrivedFrom = j.getArrivedFrom();
-        String direction = (arrivedFrom == 1000) ? "NORTH" :
-                           (arrivedFrom == 1001) ? "EAST" :
-                           (arrivedFrom == 1002) ? "SOUTH" :
-                           (arrivedFrom == 1003) ? "WEST" : "UNKNOWN";
+    public int getMostRecentJunction(){
+        if (junctionCounter > 0){
+            JunctionRecorder j = junctions[junctionCounter - 1];
+            return j.getArrivedFrom();
+        }
+        return -1;
     }
 
     /**
-     * Searches for a junction with the given coordinates in the recorded
-     * junction data. Returns the absolute heading from which the robot first
-     * arrived at that junction, or -1 if the junction has not been encountered before.
-     *
-     * @param x the x-coordinate of the junction to search for
-     * @param y the y-coordinate of the junction to search for
-     * @return the absolute heading (1000=NORTH, 1001=EAST, 1002=SOUTH, 1003=WEST)
-     *         when the robot first arrived at this junction, or -1 if not found
+     * Removes the most recent junction from the LIFO stack after backtracking.
      */
-    public int searchJunction(int x , int y){
-        for (int i = 0; i < junctionCounter; i++){
-            JunctionRecorder j = junctions[i];
-            int x_junction = j.getX();
-            int y_junction = j.getY();
-            int arrivedFrom = j.getArrivedFrom();
-            if (x == x_junction && y == y_junction) {
-                return arrivedFrom;
-
-            }
+    public void removeMostRecentJunction(){
+        if (junctionCounter > 0){
+            junctionCounter--;
         }
-        return -1;
     }
 }
