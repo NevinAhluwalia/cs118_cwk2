@@ -2,6 +2,21 @@
 import uk.ac.warwick.dcs.maze.logic.IRobot;
 import java.util.ArrayList;
 
+// Ex 3 Preamble
+// The previous robot was incapable of solving loopy mazes because in a circular path
+// surrounding squares are marked with BEENBEFORE so at junction passageExit() would return
+// 0 indicative of there being no unexplorered passages. Now the backtracking algorithim causes the 
+// robot to head opposite to the direction it initally took so for a loop it will cause it
+// to circle round it endlessly. As each direction the robot heads in (in this case) is opposite to 
+// the one it arrives in which causes it to head round once side of the loop. 
+
+// My solution works as it detects if there is a repetition of coordinates , if this occurs
+// then the robot must be in a loop or else this would not occur. If the robot is in a loop
+// then i have implemented code to choose random directions repetitively. This is because the 
+// algorithim is reliable in getting the robot to the target when it is not stuck in a loop
+// This method is quick and easy to apply and as the design specifcations states will allow
+// the robot to navigate the maze with loopss which it was previously unable to do .
+
 /**
  * Controls a robot to explore a maze using various navigation strategies
  * based on the number of available exits (deadend, corridor, junction, crossroad).
@@ -44,8 +59,7 @@ public class Ex3 {
      * Detects if the robot is stuck in a loop by tracking coordinate occurrences
      * Records the current position and counts how many times this coordinate has
      * been visited. If the same position has been visited more than 3 times,
-     * attempts to break out of the loop by choosing a random direction that leads
-     * to a square that hasn't been visited before (not BEENBEFORE).
+     * attempts to break out of the loop by choosing a random direction.
      * 
      * Essentially if there are lots of repeating coords then we are in a loop
      * we can get out of it by moving randomly until we find unexplored squares
@@ -70,15 +84,7 @@ public class Ex3 {
 
         if (count > 3){
             int direction;
-            int attempts = 0;
-            do {
-                direction = random_avoid_wall(robot);
-                attempts++;
-                // Safety check: if we've tried 10 times and all are BEENBEFORE, just use any non-wall direction
-                if (attempts > 10) {
-                    break;
-                }
-            } while (robot.look(direction) == IRobot.BEENBEFORE);
+            direction = random_avoid_wall(robot);
             robot.face(direction);
             return true; 
         }
