@@ -1,22 +1,5 @@
-
 import uk.ac.warwick.dcs.maze.logic.IRobot;
 import java.util.ArrayList;
-
-// Ex 3 Preamble
-// The previous robot was incapable of solving loopy mazes because in a circular path
-// surrounding squares are marked with BEENBEFORE so at junction passageExit() would return
-// 0 indicative of there being no unexplorered passages. Now the backtracking algorithim causes the 
-// robot to head opposite to the direction it initally took so for a loop it will cause it
-// to circle round it endlessly. As each direction the robot heads in (in this case) is opposite to 
-// the one it arrives in which causes it to head round once side of the loop. 
-
-// My solution works as it detects if there is a repetition of coordinates , if this occurs
-// then the robot must be in a loop or else this would not occur. If the robot is in a loop
-// then i have implemented code to choose random directions repetitively. This is because the 
-// algorithim is reliable in getting the robot to the target when it is not stuck in a loop
-// This method is quick and easy to apply and as the design specifcations states will allow
-// the robot to navigate the maze with loopss which it was previously unable to do hence 100% effective
-
 /**
  * Controls a robot to explore a maze using various navigation strategies
  * based on the number of available exits (deadend, corridor, junction, crossroad).
@@ -25,11 +8,37 @@ import java.util.ArrayList;
  * @version 1.0
  */
 
-public class Ex3 {
+//Grande Finale preamble
+//My approach involves saving the absolute direction in which the robot heads as it encounters
+//each junction during exploration. When the robot backtracks from a dead end, the 
+//removeJunctionsAfter logic removes all junctions that led to that dead end from the stack.
+//By the time the robot reaches the target, only the junctions on the successful path remain.
+//On subsequent runs, when the robot encounters a junction, it looks up the stored direction
+//and follows it directly, ensuring a 'perfect' solution every time 
+//I took inspiration from route B the idea of having a stack but instead my stack stores
+//the direction the robot takes as it meets the junction as it was more useful than its
+//arrivedFrom direction as it made the robot easier to direct
+//It is better than route A because the solution is simpler and more intutitive. This is improtant because
+//it means other developers can understand the approach should they have to use my code
+//not only that it is easier to implement.Moreover given two solutions it is natural to choose
+//the more intutive one.The grande finale can solve looopy mazes but gets trapped and is unable
+//on repeatss this is because i used the code from ex3 to solve loopy mazes and the issue
+//is that junctions are not recorded as the robot essentially takes random movements until
+//it can find a square that hasn't been used before, this renders my approach in this file
+//useless for future runs as the junctions which the robot took are not recorded
+//However the robot perfectly and robustly can solve multiple mazes without failure and 
+//on every future attempt it will get the exact route down leading to 'perfect' future attempts
+//it just faces this issue on loopy mazes due to my approach in the previou excercise the
+//actual code itself for memeorising the maze is fine as ultimately it is just following
+//a sequence of directions
+
+public class GrandeFinale {
     private int pollRun = 0; // Incremented after each pass
     private RobotData robotData;
     private int explorerMode = 1; // 1 = explore, 0 = backtrack
-    private ArrayList<int[]> coords = new ArrayList<>();
+    private int junctionIndex = 0; // Tracks which junction heading to follow
+    private static boolean firstRunCompleted = false; // Tracks if first run has been completed
+    private ArrayList<int[]> coords = new ArrayList<>(); // Tracks visited coordinates for loop detection
     
     /**
      * Main control method called by the maze simulator to choose the 
@@ -39,12 +48,47 @@ public class Ex3 {
      * @param robot the {@link IRobot} interface providing access to maze information
      */
     public void controlRobot(IRobot robot) {
-        if ((robot.getRuns() == 0) && (pollRun == 0)){
-            robotData = new RobotData();
-            explorerMode = 1; 
-        }
+        // Increment pollRun FIRST, before any early returns
         pollRun++;
+        
+        if ((robot.getRuns() == 0) && (pollRun == 1)){
+            robotData = new RobotData();
+            explorerMode = 1;
+            firstRunCompleted = false; // Reset flag for new maze
+        }
 
+        // On second run and beyond, skip exploration and follow the stored stack
+        if (robot.getRuns() > 0 && nonwallExits(robot) > 2) {
+            int x = robot.getLocation().x;
+            int y = robot.getLocation().y;
+            boolean found = false;
+            for (int i = robotData.getJunctionCounter() - 1; i >= 0; i--) {
+                JunctionRecorder j = robotData.getJunction(i);
+                if (j.getX() == x && j.getY() == y) {
+                    int absoluteDirection = j.getDirection();
+                    robot.setHeading(absoluteDirection);
+                    found = true;
+                    return; 
+                } 
+            }
+            if (!found){
+                System.out.println("Unrecorded junction");
+                int dir = robot.getHeading();
+                robot.setHeading(dir);
+            }
+        }
+        else if (robot.getRuns() > 0 ){
+            System.out.println(pollRun);
+            if (pollRun == 1){
+                int direction = random_avoid_wall(robot);
+                robot.face(direction);
+            } else {
+     
+                int direction = corridor(robot);
+                robot.face(direction);           
+                 }
+            return;
+        }
         //Before we do any movement just check are we in a loop or not
         if (!AreWeInALoop(robot)) {
             if (explorerMode == 1){
@@ -54,8 +98,8 @@ public class Ex3 {
             }
         }
     }
-    
-    /**
+
+        /**
      * Detects if the robot is stuck in a loop by tracking coordinate occurrences
      * Records the current position and counts how many times this coordinate has
      * been visited. If the same position has been visited more than 3 times,
@@ -91,7 +135,6 @@ public class Ex3 {
         return false;
     }
 
-
     /**
      * Control the robot's explorataion behaviour when it is in explorer mode 
      * This will handkle navigation at any number of exits and records 
@@ -100,7 +143,7 @@ public class Ex3 {
      * 
      * @param robot the {@link IRobot} interface providing access to maze information
      */
-    public void exploreControl(IRobot robot){
+    public int exploreControl(IRobot robot){
 
         int direction = 0;
         int exits = nonwallExits(robot);
@@ -126,9 +169,12 @@ public class Ex3 {
             int x = robot.getLocation().x;
             int y = robot.getLocation().y;
             int arrivedFrom = robot.getHeading();
-            robotData.recordJunction(x,y, arrivedFrom);
+            // Store ABSOLUTE direction so it works regardless of heading on second run
+            int absoluteDirection = relativeToAbsolute(arrivedFrom, direction);
+            robotData.recordJunction(x, y, arrivedFrom, absoluteDirection);
         }
         robot.face(direction);
+        return direction;
 
     }
 
@@ -141,8 +187,8 @@ public class Ex3 {
      * 
      * @param robot the {@link IRobot} interface providing access to maze information
      */
-    public void backtrackControl(IRobot robot){ 
-        int final_heading;
+    public int backtrackControl(IRobot robot){ 
+        int final_heading = 0; // Initialize to avoid compilation error
         int nonwallExits = nonwallExits(robot);
         int x = robot.getLocation().x;
         int y = robot.getLocation().y;
@@ -151,19 +197,27 @@ public class Ex3 {
             if (passageExits(robot) > 0){ 
                 explorerMode = 1;
                 int direction = passageExits(robot);
-                robotData.recordJunction(x ,y, arrivedFrom);
+                // Store ABSOLUTE direction so it works regardless of heading on second run
+                int absoluteDirection = relativeToAbsolute(arrivedFrom, direction);
+                robotData.recordJunction(x, y, arrivedFrom, absoluteDirection);
                 robot.face(direction);
+                return direction;
             } else {
                 int res = robotData.searchJunction(x,y);
                 final_heading = (res == 1000 || res == 1001) ? res + 2 : res - 2;
                 robot.setHeading(final_heading);
+                //Everything after res remove it from the stack
+                robotData.removeJunctionsAfter(x, y);
+                return final_heading;
             }
         } else if (nonwallExits == 2){
             final_heading = corridor(robot);
             robot.face(final_heading);
+            return final_heading;
         } else {
             final_heading = deadend(robot);
             robot.face(final_heading);
+            return final_heading;
         }
     }
 
@@ -173,9 +227,36 @@ public class Ex3 {
      * that old junction information does not affect a fresh exploration.
      */
     public void reset() {
-        robotData.resetJunctionCounter();
-        coords.clear();
+        // Only reset the junction counter on the very first run
+        // After the first run, preserve the stack so it can be used on subsequent runs
+        if (!firstRunCompleted && robotData != null) {
+            if (robotData.getJunctionCounter() > 0) {
+                // Junctions exist, so first run has completed - DON'T reset, preserve them
+                firstRunCompleted = true;
+            } else {
+                // No junctions yet (start of first run), safe to reset
+                robotData.resetJunctionCounter();
+            }
+        }
         explorerMode = 1;
+        junctionIndex = 0; // Reset junction index for next run
+        pollRun = 0; // Reset pollRun counter for each new run
+        coords.clear(); // Clear visited coordinates for loop detection
+    }
+    
+    /**
+     * Converts a relative direction (AHEAD, RIGHT, BEHIND, LEFT) to an absolute
+     * direction (NORTH, EAST, SOUTH, WEST) based on the robot's current heading.
+     * 
+     * @param heading The robot's current absolute heading
+     * @param relative The relative direction to convert
+     * @return The absolute direction
+     */
+    private int relativeToAbsolute(int heading, int relative) {
+        int headingOffset = heading - IRobot.NORTH; // 0=NORTH, 1=EAST, 2=SOUTH, 3=WEST
+        int relativeOffset = relative - IRobot.AHEAD; // 0=AHEAD, 1=RIGHT, 2=BEHIND, 3=LEFT
+        int absoluteOffset = (headingOffset + relativeOffset) % 4;
+        return absoluteOffset + IRobot.NORTH;
     }
     
     /**
@@ -315,6 +396,7 @@ class JunctionRecorder {
     private int x;
     private int y;
     private int arrivedFrom;
+    private int direction; // Direction the robot heads in after reaching the junction
 
     /**
      * Constructs a new {@code JunctionRecorder} with the supplied details.
@@ -323,11 +405,13 @@ class JunctionRecorder {
      * @param y the y-coordinate of the junction
      * @param arrivedFrom the heading from which the robot first arrived
      *                    at this junction
+     * @param direction the direction the robot heads in after reaching the junction
      */
-    public JunctionRecorder(int x, int y , int arrivedFrom) {
+    public JunctionRecorder(int x, int y, int arrivedFrom, int direction) {
         this.x = x; 
         this.y = y;
         this.arrivedFrom = arrivedFrom;
+        this.direction = direction;
     }
     /**
      * Returns the x-coordinate of this junction.
@@ -349,6 +433,13 @@ class JunctionRecorder {
      * @return the arrival heading
      */
     public int getArrivedFrom() { return arrivedFrom; }
+    
+    /**
+     * Returns the direction the robot heads in after reaching this junction.
+     *
+     * @return the direction heading
+     */
+    public int getDirection() { return direction; }
 
 }
 
@@ -388,8 +479,8 @@ class RobotData {
      * @param arrivedFrom the heading from which the robot first arrived
      *                    at the junction
      */
-    public void recordJunction(int x, int y, int arrivedFrom ){
-        junctions[junctionCounter] = new JunctionRecorder(x, y, arrivedFrom);
+    public void recordJunction(int x, int y, int arrivedFrom, int direction){
+        junctions[junctionCounter] = new JunctionRecorder(x, y, arrivedFrom, direction);
         printJunction(junctionCounter);
         junctionCounter++;
     }
@@ -434,5 +525,43 @@ class RobotData {
             }
         }
         return -1;
+    }
+    
+    /**
+     * Returns the current junction counter value.
+     *
+     * @return the number of junctions recorded
+     */
+    public int getJunctionCounter() {
+        return junctionCounter;
+    }
+    
+    /**
+     * Returns the JunctionRecorder at the specified index.
+     *
+     * @param index the index of the junction to retrieve
+     * @return the JunctionRecorder object at the specified index
+     */
+    public JunctionRecorder getJunction(int index) {
+        return junctions[index];
+    }
+    
+    /**
+     * Removes all junctions from the stack after the junction with the given coordinates.
+     * Finds the junction by x,y coordinates and sets the counter to remove everything after it.
+     *
+     * @param x the x-coordinate of the junction
+     * @param y the y-coordinate of the junction
+     */
+    public void removeJunctionsAfter(int x, int y) {
+        // Search through junctions to find the index where coordinates match
+        for (int i = 0; i < junctionCounter; i++) {
+            JunctionRecorder j = junctions[i];
+            if (j.getX() == x && j.getY() == y) {
+                // Found the junction - remove this junction AND all entries after it
+                junctionCounter = i;
+                return;
+            }
+        }
     }
 }
